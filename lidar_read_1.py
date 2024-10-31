@@ -1,3 +1,9 @@
+# This code is intended to read the data from a lidar SickTIM310
+# You need to run first the file in coppeliasim to get the data from coppeliasim
+# This script just reads the data, the processing is done in coppeliasim by
+# the sensor's lua script.
+
+
 import matplotlib.pyplot as plt
 from coppeliasim_zmqremoteapi_client import RemoteAPIClient
 import time
