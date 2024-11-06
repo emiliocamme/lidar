@@ -29,7 +29,8 @@ setup(
         'dynamic = urdf_tutorial_r2d2.dynamic:main',
         'lidar_publisher = urdf_tutorial_r2d2.lidar_publisher:main',
         'lidar_publisher_movement = urdf_tutorial_r2d2.lidar_publisher_movement:main',
-        'lidar_publisher_slam = urdf_tutorial_r2d2.lidar_publisher_slam:main'
+        'lidar_publisher_slam = urdf_tutorial_r2d2.lidar_publisher_slam:main',
+        'lidar_publisher_slam_map = urdf_tutorial_r2d2.lidar_publisher_slam_map:main'
         ],
     },
 )
