@@ -25,21 +25,32 @@ def generate_launch_description():
             name='lidar_publisher_slam',
             output='screen'
         )
-	slam_toolbox = Node(
-        package='slam_toolbox',
-        executable='sync_slam_toolbox_node',
-        name='slam_toolbox',
-        output='screen',
-        parameters=[{
-            'use_sim_time': True,
-            'scan_topic': '/scan',
-            'base_frame': 'base_link',
-            'odom_frame': 'reference_point',
-            'map_frame': 'map',
-        }],
-    )
+	cartographer_node = Node(
+            package='cartographer_ros',
+            executable='cartographer_node',
+            name='cartographer',
+            output='screen',
+            parameters=[{
+                'use_sim_time': True
+            }],
+            arguments=[
+                '-configuration_directory', os.path.join(get_package_share_directory('urdf_tutorial_r2d2'), 'config'),
+                '-configuration_basename', 'cartographer.lua'  # Ensure this file exists in your config folder
+            ],
+            remappings=[('/scan', '/scan')]
+        )
+	occupancy_grid_node = Node(
+            package='cartographer_ros',
+            executable='cartographer_occupancy_grid_node',
+            name='cartographer_occupancy_grid',
+            output='screen',
+            parameters=[{
+                'use_sim_time': True,
+                'resolution': 0.05
+            }],
+        )
 	
 	
-	l_d = LaunchDescription([rviz, lidar,slam_toolbox])
+	l_d = LaunchDescription([rviz, lidar,cartographer_node, occupancy_grid_node])
 	
 	return l_d
