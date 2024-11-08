@@ -42,19 +42,43 @@ class LidarPublisher(Node):
         # Initialize variable to hold map data
         self.map_data = None
         
+        # Flag for the initial scan
+        self.initial_scan_done = False
+        
     
     def timer_callback(self):
-        # Use navigate_based_on_map to calculate the next position
-        self.navigate_based_on_map()
-
+        # Check if initial scan has been completed
+        if not self.initial_scan_done:
+            self.initial_scan()  # Perform the initial scan
+        else:
+            # After initial scan, switch to navigation
+            self.navigate_based_on_map()
+            self.broadcast_transforms(self.position_x, self.position_y, self.yaw)
+            self.set_lidar_position_in_coppeliasim(self.position_x, self.position_y, self.yaw)
+            self.publish_lidar_data()
+    
+    
+    def initial_scan(self):
+    	# algo de que se quede 10 segundos, luego lo haga
+        # Rotate in place to perform a 360-degree scan
+        rotation_step = (90*math.pi)/180  # Adjust for smoother rotation if needed
+        self.yaw += rotation_step
+        
         # Broadcast transformation for ROS2 TFs
         self.broadcast_transforms(self.position_x, self.position_y, self.yaw)
-
-        # Send position and orientation to CoppeliaSim
+        
+        # Set LiDAR position in CoppeliaSim
         self.set_lidar_position_in_coppeliasim(self.position_x, self.position_y, self.yaw)
-
-        # Publish LiDAR data as usual
+        
+        # Publish LiDAR data to create the map
         self.publish_lidar_data()
+        
+        # Check if map is generated
+        if self.yaw >= 14*math.pi:
+            # End initial scan once the map is populated
+            self.initial_scan_done = True
+            self.get_logger().info("Initial scan complete. Map created.")
+        
 
         
     def navigate_based_on_map(self):
@@ -81,29 +105,46 @@ class LidarPublisher(Node):
 
 
     def check_obstacle_in_map(self, target_x, target_y):
-        # Check if the map data is available
+        # Check if map data is available
         if self.map_data is None:
             return False  # No map data available
-
+    
         # Get the map's metadata
         resolution = self.map_data.info.resolution  # Size of each cell in meters
         origin_x = self.map_data.info.origin.position.x  # X position of the map's origin
         origin_y = self.map_data.info.origin.position.y  # Y position of the map's origin
-
+    
         # Convert target position to map coordinates
         map_x = int((target_x - origin_x) / resolution)
         map_y = int((target_y - origin_y) / resolution)
+    
+        # Define a buffer zone radius (in meters) around the target point
+        buffer_radius = 0.3  # Adjust this as needed; larger values increase stopping distance
+    
+        # Determine the number of cells to check around the target point
+        buffer_cells = int(buffer_radius / resolution)
+    
+        # Check cells around the target point within the buffer zone
+        for dx in range(-buffer_cells, buffer_cells + 1):
+            for dy in range(-buffer_cells, buffer_cells + 1):
+                # Calculate coordinates for neighboring cells
+                neighbor_x = map_x + dx
+                neighbor_y = map_y + dy
+    
+                # Ensure the neighbor coordinates are within the map bounds
+                if (0 <= neighbor_x < self.map_data.info.width and
+                    0 <= neighbor_y < self.map_data.info.height):
+    
+                    # Convert 2D coordinates to a 1D index
+                    index = neighbor_y * self.map_data.info.width + neighbor_x
+                    occupancy_value = self.map_data.data[index]
+    
+                    # Assume values above a certain threshold indicate an obstacle
+                    if occupancy_value > 5:  # Threshold for detecting obstacles
+                        return True  # Obstacle detected within buffer zone
+    
+        return False  # No obstacles detected within buffer zone
 
-        # Check if the indices are within the bounds of the map
-        if 0 <= map_x < self.map_data.info.width and 0 <= map_y < self.map_data.info.height:
-            index = map_y * self.map_data.info.width + map_x  # Convert 2D coordinates to 1D index
-            occupancy_value = self.map_data.data[index]  # Get the occupancy value
-
-            # Assuming a value of 100 means occupied, 0 means free
-            if occupancy_value > 12:  # Threshold for obstacle detection
-                return True  # Obstacle detected
-
-        return False  # No obstacle detected
 
 
     def map_callback(self, msg):
