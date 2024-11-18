@@ -50,6 +50,7 @@ class LidarPublisher(Node):
         
         # Flag for the initial scan
         self.initial_scan_done = False
+        self.last_turn_direction = "left"
         
     
     def timer_callback(self):
@@ -87,38 +88,42 @@ class LidarPublisher(Node):
             # End initial scan once the map is populated
             self.initial_scan_done = True
             self.get_logger().info("Initial scan complete. Map created.")
-        
+    
 
-        
     def navigate_based_on_map(self):
         # Parameters for navigation behavior
         movement_step = 0.005  # Step size for movement in meters
         rotation_step = 0.025  # Step size for rotation in radians
-
+    
         # Define a target point slightly ahead of the current position
         target_x = self.position_x + movement_step * math.cos(self.yaw)
         target_y = self.position_y + movement_step * math.sin(self.yaw)
-
+    
         # Check if there’s an obstacle in the target position based on the map
         obstacle_detected = self.check_obstacle_in_map(target_x, target_y)
-
+    
         if obstacle_detected:
-            # If an obstacle is detected, decide to turn left
-            self.yaw += rotation_step  # Turn left as an example
-            self.get_logger().info("Obstacle detected; turning left.")
+            # Decide turn direction based on the last turn
+            if self.last_turn_direction == "left":
+                self.yaw -= rotation_step  # Turn right
+                self.get_logger().info("Obstacle detected; turning right.")
+            else:
+                self.yaw += rotation_step  # Turn left
+                self.get_logger().info("Obstacle detected; turning left.")
+            
+            # Recheck for obstacles after the turn, without moving forward
+            turned_target_x = self.position_x + movement_step * math.cos(self.yaw)
+            turned_target_y = self.position_y + movement_step * math.sin(self.yaw)
+            if not self.check_obstacle_in_map(turned_target_x, turned_target_y):
+                # Switch turn direction for the next obstacle
+                self.last_turn_direction = "right" if self.last_turn_direction == "left" else "left"
         else:
             # If no obstacle, move forward
             self.position_x = target_x
             self.position_y = target_y
             self.get_logger().info(f"Moving to target position: ({self.position_x}, {self.position_y})")
-    
-    def navigate_based_on_keystrokes(self):
-        self.position_x += (self.key_input_vel.linear.x * math.cos(self.yaw) \
-                                    + self.key_input_vel.linear.y * -math.sin(self.yaw))
-        self.position_y += (self.key_input_vel.linear.x * math.sin(self.yaw) \
-                                    + self.key_input_vel.linear.y * math.cos(self.yaw))
-        self.yaw += self.key_input_vel.angular.z
-        #self.get_logger().info(f"Moving to target position: ({self.position_x}, {self.position_y}, {self.yaw})")
+
+
 
 
     def check_obstacle_in_map(self, target_x, target_y):
@@ -136,7 +141,7 @@ class LidarPublisher(Node):
         map_y = int((target_y - origin_y) / resolution)
     
         # Define a buffer zone radius (in meters) around the target point
-        buffer_radius = 0.18  # Adjust this as needed; larger values increase stopping distance
+        buffer_radius = 0.12  # Adjust this as needed; larger values increase stopping distance
     
         # Determine the number of cells to check around the target point
         buffer_cells = int(buffer_radius / resolution)
@@ -275,6 +280,7 @@ class LidarPublisher(Node):
 
         return TransformStamped().transform.rotation.__class__(x=qx, y=qy, z=qz, w=qw)
     
+
     def list_to_vector3(self, l=[0.0, 0.0, 0.0]):
         if len(l) != 3:
             return None
