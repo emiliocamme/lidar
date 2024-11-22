@@ -30,7 +30,10 @@ setup(
         'lidar_publisher = urdf_tutorial_r2d2.lidar_publisher:main',
         'lidar_publisher_movement = urdf_tutorial_r2d2.lidar_publisher_movement:main',
         'lidar_publisher_slam = urdf_tutorial_r2d2.lidar_publisher_slam:main',
-        'lidar_publisher_slam_map = urdf_tutorial_r2d2.lidar_publisher_slam_map:main'
+        'lidar_publisher_slam_map = urdf_tutorial_r2d2.lidar_publisher_slam_map:main',
+        'lidar_publisher_slam_map2 = urdf_tutorial_r2d2.lidar_publisher_slam_map2:main',
+        'lidar_publisher_slam_kalman = urdf_tutorial_r2d2.lidar_publisher_slam_kalman:main',
+        'lidar_publisher_slam_ekalman = urdf_tutorial_r2d2.lidar_publisher_slam_ekalman:main'
         ],
     },
 )
