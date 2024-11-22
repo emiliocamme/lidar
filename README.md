@@ -26,6 +26,7 @@ Ensure you have the following installed:
 ## Python dependencies
 * time
 * math
+* numpy
 * coppeliasim_zmqremoteapi_client
   ```sh
   pip install coppeliasim-zmqremoteapi-client
