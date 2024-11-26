@@ -14,7 +14,6 @@ class LidarPublisher(Node):
         # Publisher for LaserScan
         self.publisher_ = self.create_publisher(LaserScan, 'scan', 10)
         self.timer = self.create_timer(0.1, self.timer_callback)  # Publish every 0.1 seconds
-        self.odom_publisher_ = self.create_publisher(Odometry, 'odom', 10)
         
         # Set up the TransformBroadcaster for TF messages
         self.tf_broadcaster = TransformBroadcaster(self)
@@ -47,6 +46,9 @@ class LidarPublisher(Node):
         # Subscribe to the /map topic
         self.create_subscription(OccupancyGrid, '/map', self.map_callback, 10)
 
+        # Subscribe to the /odom topic
+        self.create_subscription(Odometry, '/odom', self.odom_callback, 10)
+
         # Initialize variable to hold map data
         self.map_data = None
 
@@ -63,9 +65,7 @@ class LidarPublisher(Node):
         else:
             # After initial scan, switch to navigation
             self.navigate_based_on_map()
-            #self.broadcast_transforms(self.position_x, self.position_y, self.yaw)
             self.publish_lidar_data()
-            self.publish_odom_data()
     
     
     def initial_scan(self):
@@ -73,16 +73,13 @@ class LidarPublisher(Node):
         rotation_speed = 0.65  # Adjust for smoother rotation if needed
         
         self.publish_lidar_data()
-        self.publish_odom_data()
         
         # Rotate both motors in opposite directions
         self.publish_motor_speeds(rotation_speed, rotation_speed) #(rig)
 
-        rotation_step = 0.005  # Adjust for smoother updates
+        rotation_step = (45*math.pi)/180  # Adjust for smoother updates
         self.yaw += rotation_step
         
-        # Broadcast transformation for ROS2 TFs
-        #self.broadcast_transforms(self.position_x, self.position_y, self.yaw)
         
         # Check if map is generated
         if self.yaw >= 2*math.pi:
@@ -90,6 +87,18 @@ class LidarPublisher(Node):
             self.publish_motor_speeds(0.0, 0.0)  # Stop motors
             self.initial_scan_done = True
             self.get_logger().info("Initial scan complete. Map created.")
+    
+
+    def odom_callback(self, msg):
+        # Update position and orientation based on odometry data
+        self.position_x = msg.pose.pose.position.x
+        self.position_y = msg.pose.pose.position.y
+
+        # Convert quaternion to yaw angle
+        q = msg.pose.pose.orientation
+        siny_cosp = 2 * (q.w * q.z + q.x * q.y)
+        cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z)
+        self.yaw = math.atan2(siny_cosp, cosy_cosp)
     
 
     def navigate_based_on_map(self):
@@ -179,30 +188,11 @@ class LidarPublisher(Node):
         self.right_motor_pub.publish(Float32(data=right_speed))
 
 
-    # def broadcast_transforms(self, pos_x, pos_y, yaw):
-    #     # Broadcast the transform from map to reference_point
-    #     self.broadcast_map_to_reference_point(pos_x, pos_y, yaw)
-
-
-    # def broadcast_map_to_reference_point(self, pos_x, pos_y, yaw):
-    #     t = TransformStamped()
-    #     t.header.stamp = self.get_clock().now().to_msg()
-    #     t.header.frame_id = 'map'
-    #     t.child_frame_id = 'base_link'
-    #     t.transform.translation.x = pos_x
-    #     t.transform.translation.y = pos_y
-    #     t.transform.translation.z = 0.0
-    #     t.transform.rotation = self.euler_to_quaternion(0.0, 0.0, yaw)
-    #     self.tf_broadcaster.sendTransform(t)
-    #     #self.get_logger().info(f"Map to reference: ({self.position_x}, {self.position_y}), Yaw: {self.yaw}")
-
-
-
     def publish_lidar_data(self):
         lidar_data = self.sim.readCustomTableData(self.sim.handle_scene, "lidarData")
         if lidar_data:
             scan_msg = LaserScan()
-            scan_msg.header.frame_id = 'base_link'
+            scan_msg.header.frame_id = 'robot_base_respondable'
             scan_msg.header.stamp = self.get_clock().now().to_msg()
             scan_msg.angle_min = self.angle_min
             scan_msg.angle_max = self.angle_max
@@ -239,18 +229,6 @@ class LidarPublisher(Node):
             #self.get_logger().info("Published LaserScan data to RViz.")
         else:
             self.get_logger().info('No data retrieved from CoppeliaSim.')
-    
-
-    def publish_odom_data(self):
-        odom = Odometry()
-        odom.header.frame_id = 'map'
-        odom.header.stamp = self.get_clock().now().to_msg()
-        odom.child_frame_id = 'base_link'
-        odom.pose.pose.position.x = self.position_x
-        odom.pose.pose.position.y = self.position_y
-        odom.pose.pose.position.z = 0.0
-        odom.pose.pose.orientation = self.euler_to_quaternion(0.0, 0.0, self.yaw)
-        self.odom_publisher_.publish(odom)
                 
 
     def euler_to_quaternion(self, roll, pitch, yaw):
